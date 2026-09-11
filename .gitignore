@@ -5,3 +5,7 @@
 
 # --- Local infra (populated by the attendee's DevOps task) --------------
 *.log
+
+.env
+.current_version
+.previous_version
