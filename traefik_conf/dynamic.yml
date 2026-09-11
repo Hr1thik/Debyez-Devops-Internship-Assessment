@@ -1,0 +1,24 @@
+http:
+  routers:
+    frontend-router:
+      rule: "Host(`app.debyez.localhost`)"
+      entryPoints:
+        - "web"
+      service: "frontend-service"
+
+    backend-router:
+      rule: "Host(`api.debyez.localhost`)"
+      entryPoints:
+        - "web"
+      service: "backend-service"
+
+  services:
+    frontend-service:
+      loadBalancer:
+        servers:
+          - url: "http://frontend:80"
+
+    backend-service:
+      loadBalancer:
+        servers:
+          - url: "http://backend:8000"

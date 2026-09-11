@@ -1,10 +1,25 @@
 services:
+  traefik:
+    image: traefik:v3.1
+    container_name: debyez-traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - ./traefik_conf:/etc/traefik/dynamic:ro
+    networks:
+      - app-network
+
   localstack:
     image: localstack/localstack:3.0
     container_name: debyez-s3
     restart: unless-stopped
-    ports:
-      - "4566:4566"
     environment:
       - SERVICES=s3
       - AWS_DEFAULT_REGION=us-east-1
@@ -24,8 +39,6 @@ services:
       POSTGRES_USER: debyez_user
       POSTGRES_PASSWORD: debyez_password
       POSTGRES_DB: debyez_db
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -56,9 +69,7 @@ services:
       S3_ENDPOINT_URL: "http://localstack:4566"
       S3_PUBLIC_ENDPOINT_URL: "http://localhost:4566"
       S3_BUCKET_NAME: "debyez-bucket"
-      CORS_ORIGINS: "http://localhost,http://localhost:3000,http://app.debyez.localhost"
-    ports:
-      - "8000:8000"
+      CORS_ORIGINS: "http://app.debyez.localhost,http://localhost"
     depends_on:
       db:
         condition: service_healthy
@@ -69,6 +80,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`api.debyez.localhost`)"
+      - "traefik.http.routers.backend.entrypoints=web"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
     networks:
       - app-network
 
@@ -77,14 +93,17 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: "http://localhost:8000/api"
+        VITE_API_BASE_URL: "http://api.debyez.localhost/api"
     container_name: debyez-frontend
     restart: unless-stopped
-    ports:
-      - "3000:80"
     depends_on:
       backend:
         condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`app.debyez.localhost`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
     networks:
       - app-network
 
