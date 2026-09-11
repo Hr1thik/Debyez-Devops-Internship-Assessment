@@ -1,0 +1,77 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: debyez-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: debyez_user
+      POSTGRES_PASSWORD: debyez_password
+      POSTGRES_DB: debyez_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U debyez_user -d debyez_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: debyez-backend
+    restart: unless-stopped
+    environment:
+      APP_NAME: "DevOps Assessment Dashboard"
+      ENVIRONMENT: "development"
+      DB_HOST: "db"
+      DB_PORT: 5432
+      DB_USER: "debyez_user"
+      DB_PASSWORD: "debyez_password"
+      DB_NAME: "debyez_db"
+      AWS_ACCESS_KEY_ID: "test"
+      AWS_SECRET_ACCESS_KEY: "test"
+      AWS_REGION: "us-east-1"
+      S3_ENDPOINT_URL: "http://localhost:4566"
+      S3_PUBLIC_ENDPOINT_URL: "http://localhost:4566"
+      S3_BUCKET_NAME: "debyez-bucket"
+      CORS_ORIGINS: "http://localhost,http://localhost:3000,http://app.debyez.localhost"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: "http://localhost:8000/api"
+    container_name: debyez-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
